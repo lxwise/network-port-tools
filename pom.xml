@@ -4,104 +4,109 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>org.example</groupId>
-    <artifactId>NetworkPortTools</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <groupId>com.lxwise.net</groupId>
+    <artifactId>network-port-tools</artifactId>
+    <version>2.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>network-port-tools</name>
+    <description>网络端口管理工具（network-port-tools） 是一款基于 JavaFX 开发的跨平台桌面应用， 用于帮助开发者、运维人员快速查看系统端口占用情况，并对进程进行高效管理。</description>
 
     <properties>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <javafx.version>25.0.1</javafx.version>
+        <atlantafx.version>2.1.0</atlantafx.version>
+        <ikonli.version>12.3.1</ikonli.version>
     </properties>
 
     <dependencies>
+        <!-- JavaFX 核心模块 -->
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-base</artifactId>
-            <version>11.0.2</version>
+            <version>${javafx.version}</version>
         </dependency>
-
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-fxml</artifactId>
-            <version>11.0.2</version>
-        </dependency>
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-swing</artifactId>
-            <version>11.0.2</version>
-        </dependency>
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-controls</artifactId>
-            <version>11.0.2</version>
-        </dependency>
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-graphics</artifactId>
-            <version>11.0.2</version>
-        </dependency>
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-web</artifactId>
-            <version>11.0.2</version>
+            <version>${javafx.version}</version>
         </dependency>
 
+        <!-- AtlantaFX 现代UI主题库 -->
         <dependency>
-            <groupId>com.jfoenix</groupId>
-            <artifactId>jfoenix</artifactId>
-            <version>9.0.10</version>
+            <groupId>io.github.mkpaz</groupId>
+            <artifactId>atlantafx-base</artifactId>
+            <version>${atlantafx.version}</version>
         </dependency>
 
+        <!-- Ikonli 图标库 -->
         <dependency>
-            <groupId>org.jetbrains</groupId>
-            <artifactId>annotations</artifactId>
-            <version>RELEASE</version>
-            <scope>compile</scope>
+            <groupId>org.kordamp.ikonli</groupId>
+            <artifactId>ikonli-javafx</artifactId>
+            <version>${ikonli.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.kordamp.ikonli</groupId>
+            <artifactId>ikonli-material2-pack</artifactId>
+            <version>${ikonli.version}</version>
+        </dependency>
+
+        <!-- 工具库 -->
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+            <version>5.8.40</version>
+        </dependency>
+
+        <!-- 日志 -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>2.0.16</version>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>1.5.12</version>
         </dependency>
     </dependencies>
 
-
     <build>
+        <finalName>network-port-tools</finalName>
         <plugins>
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.10.0</version>
+                <groupId>io.github.lxwise</groupId>
+                <artifactId>jfx-maven-plugin</artifactId>
+                <version>1.0.0</version>
                 <configuration>
-                    <release>11</release>
-                    <encoding>utf-8</encoding>
-                </configuration>
-            </plugin>
-
-            <plugin>
-                <groupId>org.openjfx</groupId>
-                <artifactId>javafx-maven-plugin</artifactId>
-                <version>0.0.8</version>
-                <configuration>
+                    <type>app-image</type>
+                    <name>network-port-tools</name>
+                    <mainClass>com.lxwise.net.PortAppLauncher</mainClass>
+                    <macPackageIdentifier>network-port-tools</macPackageIdentifier>
+                    <linuxMenuGroup>System</linuxMenuGroup>
+                    <linuxPackageName>network-port-tools</linuxPackageName>
+                    <linuxShortcut>true</linuxShortcut>
+                    <vendor>lxwise</vendor>
+                    <version>${version}</version>
+                    <!--                    <aboutUrl>https://github.com/lxwise/network-port-tools</aboutUrl>-->
+                    <copyright>版权@lxwise</copyright>
+                    <description>
+                        network-port-tools
+                    </description>
+                    <!--                    <winDirChooser>true</winDirChooser>-->
+                    <!--                    <winMenu>true</winMenu>-->
+                    <!--                    <winShortcut>true</winShortcut>-->
+                    <!--                    <winPerUserInstall>true</winPerUserInstall>-->
+                    <!--                    <winShortcutPrompt>true</winShortcutPrompt>-->
                     <options>
-                        <option>--add-opens</option>
-                        <option>javafx.controls/com.sun.javafx.scene.control.behavior=com.jfoenix</option>
-                        <option>--add-opens</option>
-                        <option>javafx.controls/com.sun.javafx.scene.control=com.jfoenix</option>
-                        <option>--add-exports</option>
-                        <option>javafx.controls/com.sun.javafx.scene.control.behavior=com.jfoenix</option>
-                        <option>--add-exports</option>
-                        <option>javafx.controls/com.sun.javafx.scene.control=com.jfoenix</option>
-                        <option>--add-exports</option>
-                        <option>javafx.base/com.sun.javafx.binding=com.jfoenix</option>
-                        <option>--add-exports</option>
-                        <option>javafx.graphics/com.sun.javafx.stage=com.jfoenix</option>
-                        <option>--add-exports</option>
-                        <option>javafx.base/com.sun.javafx.event=com.jfoenix</option>
+                        <arg>-Xms32m</arg>
+                        <arg>-Xmx128m</arg>
+                        <arg>-XX:+UseCompactObjectHeaders</arg>
+                        <arg>-XX:+UseSerialGC</arg>
+                        <arg>-Dfile.encoding=UTF-8</arg>
                     </options>
-                    <stripDebug>true</stripDebug>
-                    <compress>2</compress>
-                    <noHeaderFiles>true</noHeaderFiles>
-                    <noManPages>true</noManPages>
-                    <launcher>portTool</launcher>
-                    <jlinkImageName>portTool</jlinkImageName>
-                    <jlinkZipName>portTool</jlinkZipName>
-                    <mainClass>com.ashin.net.ui.PortApp</mainClass>
                 </configuration>
             </plugin>
         </plugins>

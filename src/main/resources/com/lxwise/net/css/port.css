@@ -1,0 +1,292 @@
+/* 网络端口管理工具样式（跨平台版本） */
+
+/* ==================== 全局样式 ==================== */
+.root {
+    /*
+     * 跨平台字体栈：
+     * Windows: Segoe UI + 微软雅黑
+     * macOS:   SF Pro Display + PingFang SC
+     * Linux:   Ubuntu / Cantarell + Noto Sans CJK SC
+     * 通用回退: 无衬线体
+     */
+    -fx-font-family: "Segoe UI", "SF Pro Display", "Ubuntu", "Cantarell",
+                     "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC",
+                     "WenQuanYi Micro Hei", sans-serif;
+    -fx-font-size: 13px;
+}
+
+/* ==================== 标题样式 ==================== */
+.title-label {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -color-fg-default;
+}
+
+.version-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: -color-fg-muted;
+    -fx-background-color: -color-accent-subtle;
+    -fx-padding: 2px 8px;
+    -fx-background-radius: 10px;
+}
+
+.title-icon {
+    -fx-icon-color: -color-accent-4;
+}
+
+/* ==================== 区域标签 ==================== */
+.section-label {
+    -fx-font-weight: bold;
+    -fx-text-fill: -color-fg-default;
+}
+
+/* ==================== 状态栏样式 ==================== */
+.status-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: -color-fg-muted;
+}
+
+.status-separator {
+    -fx-text-fill: -color-border-default;
+}
+
+/* ==================== 表格样式 ==================== */
+.port-table {
+    -fx-background-color: -color-bg-default;
+    -fx-border-color: -color-border-default;
+    -fx-border-radius: 6px;
+}
+
+.port-table .column-header {
+    -fx-background-color: -color-bg-subtle;
+    -fx-font-weight: bold;
+    -fx-padding: 10px 5px;
+}
+
+.port-table .table-row-cell {
+    -fx-padding: 5px 0;
+}
+
+.port-table .table-row-cell:hover {
+    -fx-background-color: -color-accent-subtle;
+}
+
+.port-table .table-row-cell:selected {
+    -fx-background-color: -color-accent-4;
+}
+
+.port-table .table-row-cell:selected .text {
+    -fx-fill: -color-fg-emphasis;
+}
+
+/* 列对齐样式 */
+.center-column {
+    -fx-alignment: center;
+}
+
+.left-column {
+    -fx-alignment: center-left;
+}
+
+.right-column {
+    -fx-alignment: center-right;
+}
+
+/* ==================== 空数据提示 ==================== */
+.empty-icon {
+    -fx-icon-color: -color-fg-muted;
+}
+
+.empty-label {
+    -fx-font-size: 16px;
+    -fx-text-fill: -color-fg-muted;
+}
+
+.empty-hint {
+    -fx-font-size: 12px;
+    -fx-text-fill: -color-fg-subtle;
+}
+
+/* ==================== 按钮样式 ==================== */
+.button-accent {
+    -fx-background-color: -color-accent-4;
+    -fx-text-fill: -color-fg-emphasis;
+}
+
+.button-accent:hover {
+    -fx-background-color: derive(-color-accent-4, -10%);
+}
+
+/* 终止按钮 */
+.kill-button {
+    -fx-background-color: -color-danger-4;
+    -fx-text-fill: white;
+    -fx-padding: 5px 15px;
+    -fx-background-radius: 4px;
+}
+
+.kill-button:hover {
+    -fx-background-color: derive(-color-danger-4, -10%);
+}
+
+/* ==================== 搜索框样式 ==================== */
+.input-group {
+    -fx-background-color: -color-bg-subtle;
+    -fx-background-radius: 6px;
+    -fx-border-color: -color-border-default;
+    -fx-border-radius: 6px;
+}
+
+.input-group:focused {
+    -fx-border-color: -color-accent-4;
+}
+
+/* ==================== 进度条样式 ==================== */
+.progress-bar {
+    -fx-accent: -color-accent-4;
+}
+
+/* ==================== 底部栏样式 ==================== */
+.bottom-bar {
+    -fx-background-color: -color-bg-subtle;
+    -fx-border-color: -color-border-default transparent transparent transparent;
+    -fx-border-width: 1px 0 0 0;
+}
+
+.hint-label {
+    -fx-font-size: 11px;
+    -fx-text-fill: -color-fg-muted;
+}
+
+.info-icon {
+    -fx-icon-color: -color-accent-4;
+}
+
+/* ==================== 滚动面板样式 ==================== */
+.table-scroll-pane {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.table-scroll-pane > .viewport {
+    -fx-background-color: transparent;
+}
+
+/* ==================== 复选框样式 ==================== */
+.check-box {
+    -fx-cursor: hand;
+}
+
+/* ==================== 工具提示样式 ==================== */
+.tooltip {
+    -fx-font-size: 12px;
+    -fx-background-color: -color-bg-overlay;
+    -fx-text-fill: -color-fg-default;
+    -fx-padding: 8px 12px;
+    -fx-background-radius: 6px;
+}
+
+/* ==================== 分隔符样式 ==================== */
+.separator .line {
+    -fx-border-color: -color-border-default;
+    -fx-border-width: 1px;
+}
+
+/* ==================== 文本域样式 ==================== */
+.text-field {
+    -fx-background-radius: 4px;
+}
+
+.text-field:focused {
+    -fx-border-color: -color-accent-4;
+}
+
+/* ==================== 下拉框样式 ==================== */
+.combo-box {
+    -fx-background-radius: 4px;
+}
+
+.combo-box:focused {
+    -fx-border-color: -color-accent-4;
+}
+
+/* ==================== 对话框样式 ==================== */
+.dialog-pane {
+    -fx-background-color: -color-bg-default;
+}
+
+.dialog-pane .header-panel {
+    -fx-background-color: -color-bg-subtle;
+}
+
+/* ==================== 表格行选中样式增强 ==================== */
+.port-table .table-row-cell:selected .table-cell {
+    -fx-background-color: -color-accent-4;
+}
+
+.port-table .table-row-cell:selected .text {
+    -fx-fill: -color-fg-emphasis;
+}
+
+/* 选中行中的按钮保持自身样式，防止文字被覆盖为白色 */
+.port-table .table-row-cell:selected .table-cell .button .text {
+    -fx-fill: -color-fg-default;
+}
+
+.port-table .table-row-cell:selected .table-cell .button:hover .text {
+    -fx-fill: -color-fg-default;
+}
+
+/* 操作列详情按钮 */
+.detail-button {
+    -fx-background-color: transparent;
+    -fx-border-color: -color-accent-4;
+    -fx-border-radius: 4px;
+    -fx-border-width: 1px;
+    -fx-text-fill: -color-accent-4;
+    -fx-padding: 3px 8px;
+    -fx-cursor: hand;
+}
+
+.detail-button .text {
+    -fx-fill: -color-accent-4;
+}
+
+.detail-button:hover {
+    -fx-background-color: -color-accent-subtle;
+    -fx-text-fill: -color-accent-4;
+}
+
+.detail-button:hover .text {
+    -fx-fill: -color-accent-4;
+}
+
+/* 选中行中的详情按钮样式 */
+.port-table .table-row-cell:selected .detail-button {
+    -fx-background-color: rgba(255,255,255,0.15);
+    -fx-border-color: white;
+    -fx-text-fill: white;
+}
+
+.port-table .table-row-cell:selected .detail-button .text {
+    -fx-fill: white;
+}
+
+.port-table .table-row-cell:selected .detail-button:hover {
+    -fx-background-color: rgba(255,255,255,0.3);
+}
+
+/* 选中行中的终止按钮保持危险色但文字清晰 */
+.port-table .table-row-cell:selected .kill-button {
+    -fx-background-color: -color-danger-emphasis;
+    -fx-text-fill: white;
+}
+
+.port-table .table-row-cell:selected .kill-button .text {
+    -fx-fill: white;
+}
+
+/* ==================== 按钮禁用状态 ==================== */
+.button:disabled {
+    -fx-opacity: 0.5;
+}

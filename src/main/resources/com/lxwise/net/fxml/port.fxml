@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import atlantafx.base.controls.Tile?>
+<?import atlantafx.base.layout.InputGroup?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.Tooltip?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+
+<BorderPane xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.lxwise.net.ui.PortController"
+            prefHeight="720.0" prefWidth="1100.0"
+            minWidth="900.0"
+            stylesheets="@../css/port.css">
+
+    <!-- 顶部工具栏 -->
+    <top>
+        <VBox spacing="10">
+            <padding>
+                <Insets top="15" right="15" bottom="10" left="15"/>
+            </padding>
+
+            <!-- 标题区域 -->
+            <HBox alignment="CENTER_LEFT" spacing="10">
+                <FontIcon iconLiteral="mdoal-computer" iconSize="28" styleClass="title-icon"/>
+                <Label text="网络端口管理工具" styleClass="title-label"/>
+                <Label text="v2.0" styleClass="version-label"/>
+            </HBox>
+
+            <Separator/>
+
+            <!-- 第一行：搜索和基础操作 -->
+            <HBox spacing="8" alignment="CENTER_LEFT">
+                <!-- 搜索框 -->
+                <InputGroup>
+                    <FontIcon iconLiteral="mdomz-search" iconSize="18"/>
+                    <TextField fx:id="searchField"
+                               promptText="搜索端口、进程名或PID..."
+                               prefWidth="260"
+                               onKeyPressed="#handleSearchKeyPress"/>
+                </InputGroup>
+
+                <Button fx:id="refreshBtn" text="刷新" onAction="#handleRefresh" minWidth="70">
+                    <graphic>
+                        <FontIcon iconLiteral="mdomz-refresh" iconSize="16"/>
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="刷新端口列表 (Ctrl+R)"/>
+                    </tooltip>
+                </Button>
+
+                <Button fx:id="clearSearchBtn" text="清除" onAction="#handleClearSearch" minWidth="60">
+                    <graphic>
+                        <FontIcon iconLiteral="mdoal-clear" iconSize="16"/>
+                    </graphic>
+                </Button>
+
+                <Separator orientation="VERTICAL"/>
+
+                <!-- 筛选控件 -->
+                <Label text="协议:" styleClass="section-label"/>
+                <ComboBox fx:id="protocolFilterCombo" prefWidth="80"/>
+
+                <Label text="状态:" styleClass="section-label"/>
+                <ComboBox fx:id="stateFilterCombo" prefWidth="120"/>
+
+                <Button fx:id="advancedFilterBtn" text="高级筛选" onAction="#handleAdvancedFilter" minWidth="80">
+                    <graphic>
+                        <FontIcon iconLiteral="mdoal-filter_list" iconSize="16"/>
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="高级筛选条件"/>
+                    </tooltip>
+                </Button>
+
+                <Separator orientation="VERTICAL"/>
+
+                <!-- 批量操作 -->
+                <Button fx:id="killSelectedBtn" text="批量终止" onAction="#handleKillSelected" disable="true" minWidth="80">
+                    <graphic>
+                        <FontIcon iconLiteral="mdoal-delete_forever" iconSize="16"/>
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="终止选中的进程 (Delete键)"/>
+                    </tooltip>
+                </Button>
+
+                <Button fx:id="copySelectedBtn" text="批量复制" onAction="#handleCopySelected" disable="true" minWidth="80">
+                    <graphic>
+                        <FontIcon iconLiteral="mdoal-content_copy" iconSize="16"/>
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="复制选中项到剪贴板 (Ctrl+C)"/>
+                    </tooltip>
+                </Button>
+            </HBox>
+
+            <!-- 第二行：端口扫描区域 -->
+            <HBox spacing="8" alignment="CENTER_LEFT">
+                <Label text="端口扫描:" styleClass="section-label"/>
+                <TextField fx:id="startPortField" promptText="起始端口" prefWidth="90"/>
+                <Label text="-"/>
+                <TextField fx:id="endPortField" promptText="结束端口" prefWidth="90"/>
+                <Button fx:id="scanBtn" text="扫描" onAction="#handleScanPort" styleClass="button-accent" minWidth="60">
+                    <graphic>
+                        <FontIcon iconLiteral="mdoal-crop_rotate" iconSize="16"/>
+                    </graphic>
+                </Button>
+
+                <Separator orientation="VERTICAL"/>
+
+                <!-- 工具按钮 -->
+                <Button fx:id="checkPortBtn" text="端口检测" onAction="#handleCheckPort" minWidth="80">
+                    <graphic>
+                        <FontIcon iconLiteral="mdomz-search" iconSize="16"/>
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="检测指定端口是否被占用"/>
+                    </tooltip>
+                </Button>
+
+                <Button fx:id="exportBtn" text="导出" onAction="#handleExport" minWidth="60">
+                    <graphic>
+                        <FontIcon iconLiteral="mdoal-cloud_download" iconSize="16"/>
+                    </graphic>
+                    <tooltip>
+                        <Tooltip text="导出为CSV文件"/>
+                    </tooltip>
+                </Button>
+            </HBox>
+
+            <!-- 进度条（扫描时显示） -->
+            <ProgressBar fx:id="scanProgressBar" visible="false" managed="false" prefWidth="Infinity"/>
+
+            <!-- 状态栏 -->
+            <HBox alignment="CENTER_LEFT" spacing="10">
+                <Label fx:id="statusLabel" text="就绪" styleClass="status-label"/>
+                <Label text="|" styleClass="status-separator"/>
+                <Label fx:id="countLabel" text="共 0 个端口" styleClass="status-label"/>
+                <Label text="|" styleClass="status-separator"/>
+                <Label fx:id="selectedLabel" text="选中 0 个" styleClass="status-label"/>
+            </HBox>
+        </VBox>
+    </top>
+
+    <!-- 中央内容区域 -->
+    <center>
+        <ScrollPane fitToWidth="true" fitToHeight="true" styleClass="table-scroll-pane">
+            <padding>
+                <Insets top="0" right="15" bottom="15" left="15"/>
+            </padding>
+
+            <TableView fx:id="portTable" styleClass="port-table">
+                <placeholder>
+                    <VBox alignment="CENTER" spacing="10">
+                        <FontIcon iconLiteral="mdoal-inbox" iconSize="48" styleClass="empty-icon"/>
+                        <Label text="暂无端口数据" styleClass="empty-label"/>
+                        <Label text="点击刷新按钮获取端口列表" styleClass="empty-hint"/>
+                    </VBox>
+                </placeholder>
+
+                <columns>
+                    <TableColumn fx:id="selectColumn" text="选择" prefWidth="50" styleClass="center-column"/>
+                    <TableColumn fx:id="processNameColumn" text="进程名称" prefWidth="200" styleClass="left-column"/>
+                    <TableColumn fx:id="pidColumn" text="PID" prefWidth="80" styleClass="center-column"/>
+                    <TableColumn fx:id="portColumn" text="端口" prefWidth="80" styleClass="center-column"/>
+                    <TableColumn fx:id="protocolColumn" text="协议" prefWidth="70" styleClass="center-column"/>
+                    <TableColumn fx:id="stateColumn" text="状态" prefWidth="100" styleClass="center-column"/>
+                    <TableColumn fx:id="localAddressColumn" text="本地地址" prefWidth="150" styleClass="left-column"/>
+                    <TableColumn fx:id="actionColumn" text="操作" prefWidth="130" styleClass="center-column"/>
+                </columns>
+
+                <columnResizePolicy>
+                    <TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/>
+                </columnResizePolicy>
+            </TableView>
+        </ScrollPane>
+    </center>
+
+    <!-- 底部状态栏 -->
+    <bottom>
+        <HBox alignment="CENTER_LEFT" spacing="10" styleClass="bottom-bar">
+            <padding>
+                <Insets top="8" right="15" bottom="8" left="15"/>
+            </padding>
+
+            <FontIcon iconLiteral="mdoal-info" iconSize="14" styleClass="info-icon"/>
+            <Label text="快捷键: Ctrl+R刷新 | Ctrl+A全选 | Ctrl+C复制 | Ctrl+F搜索 | Delete终止 | 双击查看详情" styleClass="hint-label"/>
+        </HBox>
+    </bottom>
+
+</BorderPane>
