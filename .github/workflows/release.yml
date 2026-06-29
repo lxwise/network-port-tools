@@ -1,70 +1,148 @@
-# Release 工作流 - 推送 tag 时自动构建多平台安装包并发布到 GitHub Releases
-# 直接参照 kafka-visark/.github/workflows/build-release.yml 成功配置
+# ============================================================================
+# Release 发布工作流 - 自动构建多平台安装包并发布到 GitHub Releases
+# ============================================================================
+# 文件位置: .github/workflows/release.yml
+# 作用: 当推送版本标签(如 v2.0.0)时，自动在6个平台/格式组合上并行构建安装包，
+#       然后将所有构建产物统一发布到 GitHub Releases 供用户下载。
+#
+# 执行流程:
+#   1. build job: 6个并行任务分别生成 dmg(macOS×2) + exe + msi + deb + rpm
+#   2. release job: 收集所有构建产物 → 创建 GitHub Release → 上传安装包
+#
+# 参照: kafka-visark/.github/workflows/build-release.yml (已验证成功的配置)
+# ============================================================================
+
+# 工作流名称 - 显示在 GitHub Actions 页面
 name: Build and Release
 
+# ============================================================================
+# 触发条件配置 (on)
+# ============================================================================
 on:
+  # 当推送匹配 'v*' 模式的 tag 时触发（如 v1.0.0, v2.0.0-beta）
+  # 这是发布流程的标准触发方式: 开发者创建 tag → 自动构建 → 自动发布
   push:
     tags:
-      - 'v*'  # 创建 tag 时自动触发
-  workflow_dispatch:  # 支持手动触发
+      - 'v*'
 
+  # workflow_dispatch: 允许从 GitHub Actions 页面手动触发此工作流
+  # 用途: 测试工作流配置、重新构建失败的版本等场景
+  # 注意: 手动触发时 github.ref 不会以 'refs/tags/v' 开头，
+  #       因此 release job 不会执行（只执行 build job）
+  workflow_dispatch:
+
+# ============================================================================
+# 作业定义 (jobs)
+# ============================================================================
 jobs:
+  # ==========================================================================
+  # 构建作业 (build) - 多平台并行构建安装包
+  # ==========================================================================
+  # 使用矩阵策略创建6个并行构建任务，覆盖所有目标平台和安装包格式
   build:
+    # 矩阵策略 - 定义6个构建组合
+    # 每个组合包含: 操作系统(os)、CPU架构(arch)、安装包类型(type)、产物匹配模式(artifact)
     strategy:
       matrix:
         include:
-          # macOS ARM64 (Apple Silicon)
+          # ------------------------------------------------------------------
+          # macOS ARM64 (Apple Silicon: M1/M2/M3/M4 芯片)
+          # ------------------------------------------------------------------
+          # macos-14 runner 使用 Apple Silicon 硬件，原生构建 arm64 二进制
           - os: macos-14
             arch: arm64
-            type: dmg
-            artifact: "*.dmg"
-          # macOS x86_64 (Intel)
+            type: dmg               # macOS 磁盘映像格式（标准的 macOS 应用分发方式）
+            artifact: "*.dmg"       # 产物文件匹配模式
+
+          # ------------------------------------------------------------------
+          # macOS x86_64 (Intel 芯片)
+          # ------------------------------------------------------------------
+          # macos-15-intel 使用 Intel 硬件，为旧款 Mac 用户构建
           - os: macos-15-intel
             arch: x86_64
             type: dmg
             artifact: "*.dmg"
-          # Windows x86_64 - EXE
-          - os: windows-2022
-            arch: x86_64
-            type: exe
-            artifact: "*.exe"
-          # Windows x86_64 - MSI
-          - os: windows-2022
-            arch: x86_64
-            type: msi
-            artifact: "*.msi"
-          # Linux x86_64 - DEB
-          - os: ubuntu-latest
-            arch: x86_64
-            type: deb
-            artifact: "*.deb"
-          # Linux x86_64 - RPM
-          - os: ubuntu-latest
-            arch: x86_64
-            type: rpm
-            artifact: "*.rpm"
-    runs-on: ${{ matrix.os }}
-    env:
-      APP_VERSION: ""
 
+          # ------------------------------------------------------------------
+          # Windows x86_64 - EXE 格式
+          # ------------------------------------------------------------------
+          # 生成 .exe 可执行安装程序（无需额外工具，jpackage 内置支持）
+          - os: windows-2022
+            arch: x86_64
+            type: exe               # Windows 可执行安装程序
+            artifact: "*.exe"
+
+          # ------------------------------------------------------------------
+          # Windows x86_64 - MSI 格式
+          # ------------------------------------------------------------------
+          # 生成 .msi Windows Installer 包（企业部署首选，支持组策略）
+          # 需要 WiX Toolset 支持（GitHub runner 已预装）
+          - os: windows-2022
+            arch: x86_64
+            type: msi               # Windows Installer 包格式
+            artifact: "*.msi"
+
+          # ------------------------------------------------------------------
+          # Linux x86_64 - DEB 格式
+          # ------------------------------------------------------------------
+          # 生成 .deb 包，适用于 Debian/Ubuntu 及其衍生发行版
+          - os: ubuntu-latest
+            arch: x86_64
+            type: deb               # Debian 包格式 (dpkg/apt 管理)
+            artifact: "*.deb"
+
+          # ------------------------------------------------------------------
+          # Linux x86_64 - RPM 格式
+          # ------------------------------------------------------------------
+          # 生成 .rpm 包，适用于 Red Hat/Fedora/CentOS/openSUSE 等发行版
+          - os: ubuntu-latest
+            arch: x86_64
+            type: rpm               # RPM 包格式 (rpm/dnf/yum 管理)
+            artifact: "*.rpm"
+
+    # 运行环境 - 根据矩阵选择对应操作系统
+    runs-on: ${{ matrix.os }}
+
+    # 作业级环境变量
+    env:
+      APP_VERSION: ""   # 占位符，后续步骤中会动态设置实际版本号
+
+    # --------------------------------------------------------------------------
+    # 构建步骤
+    # --------------------------------------------------------------------------
     steps:
-      - name: 检出项目
+      # ========================================================================
+      # 步骤1: 检出项目源代码
+      # ========================================================================
+      - name: 检出项目源代码
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # 需要完整历史以获取 tag 信息
+          # fetch-depth: 0 表示获取完整的 git 历史记录（非浅克隆）
+          # 原因: 需要访问 tag 信息来解析版本号
+          # 默认值 1 只获取最新提交，无法读取 tag 信息
+          fetch-depth: 0
 
-      - name: 设置 Java
+      # ========================================================================
+      # 步骤2: 设置 Java 开发环境
+      # ========================================================================
+      - name: 设置 Java 开发环境 (Zulu JDK 25)
         uses: actions/setup-java@v4
         with:
-          java-version: '25'
-          distribution: 'zulu'
-          cache: 'maven'
+          java-version: '25'      # 项目要求的 JDK 版本
+          distribution: 'zulu'    # 必须用 Zulu（Temurin 缺少 jmods）
+          cache: 'maven'          # 缓存 Maven 依赖加速构建
 
-      # Windows 专用 - 配置 WiX Toolset（生成 MSI 需要）
-      - name: Configure WiX Toolset (Windows)
+      # ========================================================================
+      # 步骤3: (仅 Windows MSI) 配置 WiX Toolset
+      # ========================================================================
+      # WiX Toolset 是创建 .msi 安装包的必要工具
+      # GitHub Windows runner 预装了 WiX，但需要将其添加到 PATH
+      # 执行条件: 仅在 Windows 上且构建类型为 msi 时执行
+      - name: 配置 WiX Toolset (仅 Windows MSI 构建需要)
         if: runner.os == 'Windows' && matrix.type == 'msi'
         shell: powershell
         run: |
+          # 定义可能的 WiX Toolset 安装路径列表
           $wixPaths = @(
             "${env:ProgramFiles(x86)}\WiX Toolset v3.14\bin",
             "${env:ProgramFiles}\WiX Toolset v3.14\bin",
@@ -74,6 +152,8 @@ jobs:
             "C:\Program Files\WiX Toolset v3.14\bin"
           )
 
+          # 遍历路径列表，查找包含 light.exe 的目录
+          # light.exe 是 WiX 的链接器，存在即表明 WiX 已安装
           $foundPath = $null
           foreach ($path in $wixPaths) {
             if (Test-Path "$path\light.exe") {
@@ -83,6 +163,7 @@ jobs:
             }
           }
 
+          # 如果预定义路径未找到，尝试通过系统 PATH 搜索
           if ($null -eq $foundPath) {
             $whereResult = where.exe light.exe 2>&1
             if ($whereResult -match "light\.exe") {
@@ -91,94 +172,188 @@ jobs:
             }
           }
 
+          # 如果仍未找到，报错退出
           if ($null -eq $foundPath) {
             Write-Error "Could not find WiX Toolset installation."
             exit 1
           }
 
+          # 将 WiX 路径添加到当前步骤和后续步骤的 PATH 中
+          # GITHUB_PATH 文件用于持久化修改后续步骤的 PATH 环境变量
           $env:PATH = "$foundPath;$env:PATH"
           echo "$foundPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           Write-Output "Added WiX Toolset to PATH: $foundPath"
 
-      # Linux 专用 - 安装打包工具
-      - name: Install Linux packaging tools
+      # ========================================================================
+      # 步骤4: (仅 Linux) 安装打包工具
+      # ========================================================================
+      # fakeroot: Linux 上 jpackage 创建 deb/rpm 包时的必要依赖
+      - name: 安装 Linux 打包工具 (fakeroot)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y fakeroot
 
-      - name: 解析版本号
+      # ========================================================================
+      # 步骤5: 从 pom.xml 解析项目版本号
+      # ========================================================================
+      # 作用: 读取 pom.xml 中的 <version> 标签值，用于构建产物命名
+      # id: get-version 允许后续步骤通过 steps.get-version.outputs.version 引用
+      - name: 解析项目版本号
         id: get-version
         shell: bash
         run: |
+          # Windows 和 Linux/macOS 使用不同的方式解析版本号
           if [ "${{ runner.os }}" == "Windows" ]; then
+            # Windows: 使用 PowerShell 正则表达式从 pom.xml 提取版本号
+            # 原因: Windows bash 环境下 mvn exec:exec 可能有编码问题
             VERSION=$(powershell -Command "(Get-Content pom.xml -Raw) -match '<version>([\d\.]+)' | ForEach-Object { \$matches[1] }")
           else
+            # Linux/macOS: 使用 Maven exec 插件输出版本号（更可靠）
+            # -q: 静默模式，不输出 Maven 日志
+            # -Dexec.executable=echo: 使用 echo 命令
+            # -Dexec.args='${project.version}': 输出项目版本
             VERSION=$(mvn -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec)
           fi
+          # 去除可能的 -SNAPSHOT 后缀（正式发布版本不需要）
           VERSION=$(echo "$VERSION" | sed 's/-SNAPSHOT$//')
+          # 将版本号写入环境变量（当前 job 的后续步骤可用）
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+          # 将版本号写入步骤输出（其他 job 可通过 needs.build.outputs 引用）
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "✅ 项目版本: $VERSION"
 
-      - name: 验证 Java
+      # ========================================================================
+      # 步骤6: 验证 Java 环境
+      # ========================================================================
+      - name: 验证 Java 环境
         run: |
           java -version
           echo "JAVA_HOME: $JAVA_HOME"
 
-      - name: 执行打包
+      # ========================================================================
+      # 步骤7: 执行 Maven 构建并生成安装包
+      # ========================================================================
+      # 核心构建步骤 - jfx-maven-plugin 会执行以下完整流程:
+      #   1. mvn compile - 编译 Java 源代码
+      #   2. mvn package - 打包为 JAR 文件
+      #   3. jlink - 创建精简的自定义 JRE 运行时（仅包含所需模块）
+      #   4. jpackage - 将应用+运行时打包为原生安装程序
+      - name: 执行构建和打包
         run: mvn -B clean jfx:package -DAPP_TYPE=${{ matrix.type }}
 
-      - name: 列举生成的构建物
+      # ========================================================================
+      # 步骤8: 列出构建产物
+      # ========================================================================
+      # 诊断步骤 - 确认安装包已成功生成，并显示文件大小
+      - name: 列举生成的构建产物
         shell: bash
         run: |
           ls -lh target/javafx/ 2>/dev/null || dir target\\javafx
 
-      - name: 上传构建物
+      # ========================================================================
+      # 步骤9: 上传构建产物为 Artifact
+      # ========================================================================
+      # 作用: 将构建生成的安装包上传到 GitHub，供 release job 下载使用
+      # Artifact 是 GitHub Actions 的临时存储机制，用于在 job 之间传递文件
+      - name: 上传构建产物
         uses: actions/upload-artifact@v4
         with:
+          # name: Artifact 的唯一标识名称
+          # 格式: network-port-tools-{操作系统}-{架构}-{类型}
+          # 例如: network-port-tools-ubuntu-latest-x86_64-deb
           name: network-port-tools-${{ matrix.os }}-${{ matrix.arch }}-${{ matrix.type }}
+
+          # path: 要上传的文件路径，支持 glob 模式
+          # ${{ matrix.artifact }} 值如 "*.deb", "*.exe" 等
           path: target/javafx/${{ matrix.artifact }}
+
+          # retention-days: Artifact 保留天数
+          # 超过此天数后自动删除，节省存储空间
+          # Release 发布后安装包已保存在 Release 中，无需长期保留 Artifact
           retention-days: 5
 
+  # ==========================================================================
+  # 发布作业 (release) - 创建 GitHub Release 并上传安装包
+  # ==========================================================================
   release:
+    # needs: 声明依赖关系 - release 必须在 build 全部成功后才执行
+    # 如果任何一个 build 任务失败，release 不会执行
     needs: build
+
+    # 发布操作只需要在一个环境上执行即可
     runs-on: ubuntu-latest
+
+    # if: 条件判断 - 仅在 tag 推送时执行发布
+    # workflow_dispatch（手动触发）时不会创建 Release
+    # startsWith(github.ref, 'refs/tags/v') 检查当前引用是否为 v 开头的 tag
     if: startsWith(github.ref, 'refs/tags/v')
+
+    # permissions: 声明此 job 需要的 GITHUB_TOKEN 权限
+    # contents: write 允许创建 Release 和上传 Release 资产
     permissions:
       contents: write
 
     steps:
-      - name: 检出项目
+      # ========================================================================
+      # 步骤1: 检出项目（用于获取 git 信息）
+      # ========================================================================
+      - name: 检出项目源代码
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0    # 完整历史，用于生成变更日志
 
-      - name: 解析版本号
+      # ========================================================================
+      # 步骤2: 从 Git tag 解析发布版本号
+      # ========================================================================
+      # 从 refs/tags/v2.0.0 中提取 "2.0.0" 作为版本号
+      - name: 解析发布版本号
         id: get-version
         run: |
+          # ${GITHUB_REF#refs/tags/v} 是 bash 字符串操作:
+          # 从 GITHUB_REF 变量值的开头去除 "refs/tags/v" 前缀
+          # 例如: "refs/tags/v2.0.0" → "2.0.0"
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "✅ Release 版本: $VERSION"
 
-      - name: 下载所有构建物
+      # ========================================================================
+      # 步骤3: 下载所有构建产物
+      # ========================================================================
+      # 从 build job 上传的 6 个 Artifact 中下载所有安装包文件
+      - name: 下载所有平台的构建产物
         uses: actions/download-artifact@v4
         with:
+          # path: 下载到的目标目录
+          # 每个 Artifact 会创建一个子目录，目录名为上传时指定的 name
           path: artifacts
 
-      - name: 列举下载的构建物
+      # ========================================================================
+      # 步骤4: 列出下载的构建产物（诊断/调试）
+      # ========================================================================
+      - name: 列举所有下载的构建产物
         run: |
-          echo "--- 所有构建物 ---"
+          echo "--- 所有构建产物 ---"
+          # find 命令递归列出所有文件
           find artifacts -type f 2>/dev/null || ls -laR artifacts/ || echo "目录不存在"
-          echo "--- 目录结构 ---"
+          echo "--- 工作目录 ---"
           pwd
           ls -la
 
-      - name: 创建 Release
+      # ========================================================================
+      # 步骤5: 创建 GitHub Release 并上传安装包
+      # ========================================================================
+      # 使用社区维护的 softprops/action-gh-release 创建 Release
+      # 此 action 功能比 GitHub 官方工具更完善，支持 Markdown body 和批量上传
+      - name: 创建 GitHub Release 并上传安装包
         uses: softprops/action-gh-release@v2
         with:
+          # name: Release 标题（显示在 Releases 页面）
           name: Network Port Tools v${{ env.APP_VERSION }}
+
+          # body: Release 正文内容（支持 Markdown 格式）
+          # 包含下载表格、系统要求和更新日志链接
           body: |
             ## Network Port Tools v${{ env.APP_VERSION }}
 
@@ -202,8 +377,21 @@ jobs:
 
             ### 更新日志
             请查看 [commit 历史](https://github.com/${{ github.repository }}/commits/v${{ env.APP_VERSION }}) 了解变更详情。
+
+          # draft: false - 直接发布（非草稿状态）
+          # 设为 true 可先创建草稿，手动审核后再发布
           draft: false
+
+          # prerelease: false - 标记为正式版本（非预发布）
+          # 预发布版本在 Releases 页面会有特殊标记
           prerelease: false
+
+          # files: 要上传到 Release 的文件路径列表
+          # 支持 glob 模式，artifacts/**/*.* 匹配所有子目录中的文件
           files: |
             artifacts/**/*.*
+
+          # token: GitHub API 认证令牌
+          # secrets.GITHUB_TOKEN 是 GitHub 自动提供的临时令牌
+          # 配合上面的 permissions.contents: write 使用
           token: ${{ secrets.GITHUB_TOKEN }}

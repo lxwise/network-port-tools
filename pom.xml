@@ -84,7 +84,7 @@
                     <type>${APP_TYPE}</type>
                     <name>network-port-tools</name>
                     <mainClass>com.lxwise.net.PortAppLauncher</mainClass>
-                    <addModules>java.base,java.desktop,java.logging,java.scripting,jdk.jfr</addModules>
+                    <addModules>java.base,java.desktop,java.logging,java.management,java.scripting,jdk.jfr,java.naming,java.security.jgss,jdk.zipfs</addModules>
                     <jlinkOptions>
                         <option>--strip-native-commands</option>
                         <option>--strip-debug</option>
@@ -116,12 +116,10 @@
                         <option>-Dprism.vsync=false</option>
                         <option>-Djavafx.animation.fullspeed=true</option>
                         <option>-Dsun.java2d.allowhidpi=false</option>
-                        <option>-XX:+UnlockExperimentalVMOptions</option>
                         <option>-XX:+UseCompactObjectHeaders</option>
                         <option>-XX:+UseStringDeduplication</option>
                         <option>-XX:TieredStopAtLevel=1</option>
                         <option>-XX:GCTimeRatio=95</option>
-                        <option>-XX:+G1UseAdaptiveIHOP</option>
                         <option>-XX:MaxMetaspaceFreeRatio=50</option>
                         <option>-XX:MinMetaspaceFreeRatio=20</option>
                         <option>-XX:G1PeriodicGCInterval=500</option>

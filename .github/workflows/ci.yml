@@ -1,56 +1,152 @@
-# CI 工作流 - 每次推送和PR时自动构建验证
-# 参考 kafka-visark: 使用平台对应的具体类型，而非 app-image
-# 原因: pom.xml 中配置了 linuxPackageName/winShortcut 等选项，
-#       这些选项只能用于具体安装包类型(deb/rpm/exe/dmg)，不兼容 app-image
+# ============================================================================
+# CI 持续集成工作流 - 自动构建验证
+# ============================================================================
+# 文件位置: .github/workflows/ci.yml
+# 作用: 每次代码推送或 PR 时，在三大操作系统(Linux/Windows/macOS)上自动构建项目，
+#       验证代码能正确编译并生成对应平台的安装包，确保代码质量。
+#
+# 重要说明:
+#   - 不能使用 app-image 类型! 因为 pom.xml 中配置了 linuxPackageName/winShortcut 等
+#     平台专用选项，这些选项只能用于具体安装包类型(deb/rpm/exe/dmg)，与 app-image 不兼容
+#   - 必须使用 Zulu JDK! 因为 Temurin 从 JDK 24 起不再包含 jmods 目录，
+#     而 jlink/jpackage 需要 jmods 来创建自定义运行时镜像
+# ============================================================================
+
+# 工作流名称 - 显示在 GitHub Actions 页面的标题
 name: CI Build
 
+# ============================================================================
+# 触发条件配置 (on)
+# ============================================================================
+# 定义什么事件会触发此工作流执行
 on:
+  # 当代码推送(push)到以下分支时触发
   push:
-    branches: [ main, master, develop ]
+    branches: [ main, master, develop ]  # 监听主分支和开发分支
+  # 当创建或更新 Pull Request(PR) 到以下分支时触发
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master ]           # 只监听合并到主分支的 PR
 
+# ============================================================================
+# 作业定义 (jobs)
+# ============================================================================
 jobs:
+  # --------------------------------------------------------------------------
+  # 构建作业 (build)
+  # --------------------------------------------------------------------------
+  # 使用矩阵策略在多个平台上并行构建，验证跨平台兼容性
   build:
+    # 矩阵策略 (strategy.matrix)
+    # 作用: 定义多个构建环境的组合，GitHub Actions 会为每个组合创建一个独立的作业实例
+    # 所有组合会并行执行，大幅缩短整体构建时间
     strategy:
       matrix:
+        # include: 精确定义每个构建组合（而非笛卡尔积方式）
+        # 每个条目代表一个独立的构建环境
         include:
-          - os: ubuntu-latest
-            type: deb
-          - os: windows-latest
-            type: exe
-          - os: macos-latest
-            type: dmg
+          # ---------- Linux 构建 ----------
+          # 在 Ubuntu 最新版上构建 .deb 安装包（Debian/Ubuntu 系格式）
+          - os: ubuntu-latest     # 使用 GitHub 提供的最新 Ubuntu runner
+            type: deb             # 构建 Debian 安装包格式
+          # ---------- Windows 构建 ----------
+          # 在 Windows 最新版上构建 .exe 安装程序
+          - os: windows-latest    # 使用 GitHub 提供的最新 Windows runner
+            type: exe             # 构建 EXE 可执行安装程序格式
+          # ---------- macOS 构建 ----------
+          # 在 macOS 最新版上构建 .dmg 磁盘映像
+          - os: macos-latest      # 使用 GitHub 提供的最新 macOS runner
+            type: dmg             # 构建 DMG 磁盘映像格式
+
+    # 指定运行环境 - 使用矩阵变量动态选择对应的操作系统
+    # ${{ matrix.os }} 会被替换为当前矩阵组合中的 os 值
     runs-on: ${{ matrix.os }}
 
+    # --------------------------------------------------------------------------
+    # 步骤定义 (steps)
+    # --------------------------------------------------------------------------
     steps:
-      - name: 检出项目
-        uses: actions/checkout@v4
+      # ========================================================================
+      # 步骤1: 检出项目源代码
+      # ========================================================================
+      # 作用: 将 GitHub 仓库的代码克隆到 runner 的工作目录中
+      # 这是几乎所有工作流的第一个步骤，因为后续步骤需要访问源代码
+      - name: 检出项目源代码
+        uses: actions/checkout@v4   # 使用 GitHub 官方的 checkout action, v4 为最新稳定版
 
-      - name: 设置 Java
-        uses: actions/setup-java@v4
+      # ========================================================================
+      # 步骤2: 设置 Java 开发环境
+      # ========================================================================
+      # 作用: 下载并配置指定版本的 JDK，设置 JAVA_HOME 和 PATH 环境变量
+      - name: 设置 Java 开发环境 (Zulu JDK 25)
+        uses: actions/setup-java@v4   # GitHub 官方的 Java 环境配置 action
         with:
+          # java-version: 指定 JDK 版本号
+          # 本项目需要 JDK 25（pom.xml 中 maven.compiler.source=25）
           java-version: '25'
+
+          # distribution: JDK 发行版选择
+          # 可选值: 'temurin'(Eclipse), 'zulu'(Azul), 'corretto'(Amazon),
+          #         'liberica'(BellSoft), 'microsoft', 'oracle' 等
+          # 【重要】必须使用 'zulu'! 原因:
+          #   Temurin 从 JDK 24 起不再附带 jmods 目录，
+          #   而 jlink/jpackage 打包工具依赖 jmods 创建自定义运行时
+          #   Zulu 仍保留完整的 jmods 支持
           distribution: 'zulu'
+
+          # cache: 启用依赖缓存，加速后续构建
+          # 'maven' 表示缓存 ~/.m2/repository 目录中的 Maven 依赖
+          # 首次构建时创建缓存，后续构建直接使用缓存的依赖，跳过下载步骤
           cache: 'maven'
 
-      # Linux 专用 - 安装打包工具
-      - name: Install Linux packaging tools
-        if: runner.os == 'Linux'
+      # ========================================================================
+      # 步骤3: (仅 Linux) 安装原生打包工具
+      # ========================================================================
+      # 作用: 安装 Linux 上创建 .deb/.rpm 包所需的系统工具
+      # if 条件: 只在 Linux runner 上执行此步骤
+      - name: 安装 Linux 打包工具 (fakeroot)
+        if: runner.os == 'Linux'    # runner.os 是 GitHub 内置上下文，返回当前 OS 类型
         run: |
+          # 更新 apt 包索引
           sudo apt-get update
+          # 安装 fakeroot - jpackage 在 Linux 上创建 deb/rpm 时需要此工具
+          # fakeroot 允许普通用户模拟 root 权限来构建安装包
           sudo apt-get install -y fakeroot
 
-      - name: 验证 Java
+      # ========================================================================
+      # 步骤4: 验证 Java 环境配置
+      # ========================================================================
+      # 作用: 打印 Java 版本和 JAVA_HOME 路径，便于构建失败时排查环境问题
+      - name: 验证 Java 环境配置
         run: |
           java -version
           echo "JAVA_HOME: $JAVA_HOME"
 
-      - name: 执行打包
+      # ========================================================================
+      # 步骤5: 执行 Maven 构建和打包
+      # ========================================================================
+      # 作用: 使用 jfx-maven-plugin 编译项目并生成平台对应的安装包
+      # 这是核心构建步骤，验证代码能否正确编译并打包为原生安装程序
+      - name: 执行 Maven 构建和打包
         run: mvn -B clean jfx:package -DAPP_TYPE=${{ matrix.type }}
+        # 参数解释:
+        #   mvn          - Maven 构建工具
+        #   -B           - Batch 模式，禁用交互式输入（CI 环境必需）
+        #   clean        - 清除上一次构建的输出 (target/ 目录)
+        #   jfx:package  - 执行 jfx-maven-plugin 的 package 目标
+        #                  内部流程: compile → package(jar) → jlink(运行时) → jpackage(安装包)
+        #   -DAPP_TYPE=${{ matrix.type }}
+        #              - 通过 Maven 属性传递打包类型
+        #              - 对应 pom.xml 中 <type>${APP_TYPE}</type>
+        #              - 值为: deb(Linux) / exe(Windows) / dmg(macOS)
 
+      # ========================================================================
+      # 步骤6: 验证构建产物
+      # ========================================================================
+      # 作用: 列出生成的安装包文件，确认构建成功并查看产物大小
       - name: 验证构建产物
-        shell: bash
+        shell: bash   # 强制使用 bash（确保 Windows 上也使用统一的 shell 语法）
         run: |
-          echo "✅ Build completed successfully on ${{ matrix.os }} (type: ${{ matrix.type }})"
+          echo "✅ 构建成功: ${{ matrix.os }} (类型: ${{ matrix.type }})"
+          # 列出 target/javafx/ 目录下的构建产物
+          # Linux/macOS 使用 ls, 失败时 fallback 到 Windows 的 dir 命令
           ls -lh target/javafx/ 2>/dev/null || dir target\\javafx
