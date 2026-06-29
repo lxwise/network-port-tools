@@ -290,3 +290,47 @@
 .button:disabled {
     -fx-opacity: 0.5;
 }
+
+/* ==================== TabPane 样式 ==================== */
+.main-tab-pane > .tab-header-area > .tab-header-background {
+    -fx-background-color: -color-bg-subtle;
+}
+
+.main-tab-pane .tab {
+    -fx-background-color: -color-bg-default;
+    -fx-padding: 8px 16px;
+}
+
+.main-tab-pane .tab:selected {
+    -fx-background-color: -color-bg-default;
+}
+
+.main-tab-pane .tab .tab-label {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+}
+
+/* ==================== 快捷命令面板样式 ==================== */
+.cmd-output-area {
+    -fx-font-family: "Cascadia Code", "JetBrains Mono", "Consolas", "SF Mono",
+                     "Source Code Pro", "Menlo", "DejaVu Sans Mono", monospace;
+    -fx-font-size: 12px;
+    -fx-background-color: -color-bg-subtle;
+    -fx-border-color: -color-border-default;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-padding: 10px;
+}
+
+.cmd-output-area .content {
+    -fx-background-color: -color-bg-subtle;
+}
+
+.cmd-output-area:focused {
+    -fx-border-color: -color-accent-4;
+}
+
+/* 命令输出区文本颜色 */
+.cmd-output-area .text {
+    -fx-fill: -color-fg-default;
+}

@@ -79,12 +79,12 @@
             <plugin>
                 <groupId>io.github.lxwise</groupId>
                 <artifactId>jfx-maven-plugin</artifactId>
-                <version>1.1.0</version>
+                <version>1.1.1</version>
                 <configuration>
                     <type>${APP_TYPE}</type>
                     <name>network-port-tools</name>
                     <mainClass>com.lxwise.net.PortAppLauncher</mainClass>
-                    <addModules>java.base,java.desktop,java.logging,java.management,java.scripting,jdk.jfr,java.naming,java.security.jgss,jdk.zipfs</addModules>
+                    <addModules>java.base,java.desktop,java.logging,java.management,java.scripting,java.naming,java.security.jgss,java.security.sasl,java.sql,java.transaction.xa,java.xml,jdk.jfr,jdk.zipfs</addModules>
                     <jlinkOptions>
                         <option>--strip-native-commands</option>
                         <option>--strip-debug</option>
@@ -115,23 +115,9 @@
                         <option>-Dfile.encoding=UTF-8</option>
                         <option>-Dprism.vsync=false</option>
                         <option>-Djavafx.animation.fullspeed=true</option>
-                        <option>-Dsun.java2d.allowhidpi=false</option>
                         <option>-XX:+UseCompactObjectHeaders</option>
                         <option>-XX:+UseStringDeduplication</option>
-                        <option>-XX:TieredStopAtLevel=1</option>
-                        <option>-XX:GCTimeRatio=95</option>
-                        <option>-XX:MaxMetaspaceFreeRatio=50</option>
-                        <option>-XX:MinMetaspaceFreeRatio=20</option>
-                        <option>-XX:G1PeriodicGCInterval=500</option>
-                        <option>-XX:InitiatingHeapOccupancyPercent=20</option>
-                        <option>-XX:MaxHeapFreeRatio=10</option>
-                        <option>-XX:MinHeapFreeRatio=3</option>
-                        <option>-XX:G1HeapWastePercent=3</option>
-                        <option>-XX:G1ReservePercent=5</option>
-                        <option>-XX:G1MixedGCCountTarget=1</option>
-                        <option>-XX:MaxGCPauseMillis=30</option>
-                        <option>-Dprism.maxvram=2G</option>
-                        <option>-Dprism.order=es2</option>
+                        <option>-XX:MaxGCPauseMillis=50</option>
                     </options>
                 </configuration>
             </plugin>

@@ -1,9 +1,12 @@
 package com.lxwise.net.ui;
 
 import atlantafx.base.theme.Styles;
+import com.lxwise.net.tools.CmdConstants;
+import com.lxwise.net.tools.NetworkCommand;
 import com.lxwise.net.tools.PortInfo;
 import com.lxwise.net.tools.PortOperateService;
 import com.lxwise.net.tools.PortOperateServiceImpl;
+import com.lxwise.net.utils.CmdUtils;
 import com.lxwise.net.utils.DialogUtils;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -33,16 +36,19 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
 /**
  * 端口控制器
- * 管理端口列表展示、搜索、终止进程等功能
+ * 管理端口列表展示、搜索、终止进程、快捷命令执行等功能
  *
  * @author lstar
  * @create 2022-03
  * @update 2025-04 全面升级，新增批量操作、端口扫描等功能
+ * @update 2025-06 新增快捷命令执行面板，支持分类选择和异步执行
  */
 public class PortController implements Initializable {
 
@@ -61,6 +67,11 @@ public class PortController implements Initializable {
     private String currentStateFilter = "全部";
     private Integer currentMinPort = null;
     private Integer currentMaxPort = null;
+
+    // 快捷命令状态
+    private Map<String, List<NetworkCommand>> quickCommandMap;
+    private Task<String> currentCommandTask;
+    private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     // ==================== FXML组件 ====================
 
@@ -118,6 +129,37 @@ public class PortController implements Initializable {
     @FXML
     private TableColumn<PortInfo, Void> actionColumn;
 
+    // ==================== 快捷命令FXML组件 ====================
+
+    @FXML
+    private TabPane mainTabPane;
+    @FXML
+    private ComboBox<String> cmdCategoryCombo;
+    @FXML
+    private ComboBox<NetworkCommand> cmdSelectCombo;
+    @FXML
+    private TextField cmdParamField;
+    @FXML
+    private Label cmdParamHintLabel;
+    @FXML
+    private Label cmdDescLabel;
+    @FXML
+    private Label cmdStatusLabel;
+    @FXML
+    private Label cmdOsLabel;
+    @FXML
+    private ProgressBar cmdProgressBar;
+    @FXML
+    private TextArea cmdOutputArea;
+    @FXML
+    private Button cmdExecuteBtn;
+    @FXML
+    private Button cmdCancelBtn;
+    @FXML
+    private Button cmdClearBtn;
+    @FXML
+    private Button cmdCopyOutputBtn;
+
     // ==================== 初始化 ====================
 
     @Override
@@ -125,6 +167,7 @@ public class PortController implements Initializable {
         logger.info("初始化端口控制器...");
         initializeTable();
         setupListeners();
+        initializeQuickCommands();
         loadPortData();
     }
 
@@ -904,5 +947,273 @@ public class PortController implements Initializable {
         portTable.getSelectionModel().clearSelection();
         updateSelectedLabel();
         portTable.refresh();
+    }
+
+    // ==================== 快捷命令功能 ====================
+
+    /**
+     * 初始化快捷命令面板
+     */
+    private void initializeQuickCommands() {
+        // 加载命令数据
+        quickCommandMap = CmdConstants.getQuickCommands();
+
+        // 显示操作系统信息
+        if (cmdOsLabel != null) {
+            cmdOsLabel.setText("当前系统: " + CmdConstants.getOsName());
+        }
+
+        // 初始化分类下拉框
+        if (cmdCategoryCombo != null) {
+            List<String> categories = CmdConstants.getCategories();
+            cmdCategoryCombo.setItems(FXCollections.observableArrayList(categories));
+
+            // 分类变化时更新命令列表
+            cmdCategoryCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
+                updateCommandList(newVal);
+            });
+
+            // 默认选中第一个分类
+            if (!categories.isEmpty()) {
+                cmdCategoryCombo.getSelectionModel().selectFirst();
+            }
+        }
+
+        // 命令选择变化时更新描述和参数提示
+        if (cmdSelectCombo != null) {
+            cmdSelectCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
+                updateCommandInfo(newVal);
+            });
+
+            // 自定义显示
+            cmdSelectCombo.setCellFactory(lv -> new ListCell<>() {
+                @Override
+                protected void updateItem(NetworkCommand item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getDisplayName());
+                }
+            });
+            cmdSelectCombo.setButtonCell(new ListCell<>() {
+                @Override
+                protected void updateItem(NetworkCommand item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getDisplayName());
+                }
+            });
+        }
+
+        logger.info("快捷命令面板初始化完成，共加载 {} 个分类", quickCommandMap.size());
+    }
+
+    /**
+     * 更新命令列表（根据分类）
+     */
+    private void updateCommandList(String category) {
+        if (cmdSelectCombo == null || category == null) return;
+
+        List<NetworkCommand> commands = quickCommandMap.get(category);
+        if (commands != null) {
+            cmdSelectCombo.setItems(FXCollections.observableArrayList(commands));
+            if (!commands.isEmpty()) {
+                cmdSelectCombo.getSelectionModel().selectFirst();
+            }
+        }
+    }
+
+    /**
+     * 更新命令信息显示（描述、参数提示）
+     */
+    private void updateCommandInfo(NetworkCommand command) {
+        if (command == null) return;
+
+        if (cmdDescLabel != null) {
+            cmdDescLabel.setText(command.getDescription());
+        }
+        if (cmdParamHintLabel != null) {
+            cmdParamHintLabel.setText(command.isRequiresParam() ? "(" + command.getParamHint() + ")" : "(无需参数)");
+        }
+        if (cmdParamField != null) {
+            cmdParamField.setPromptText(command.isRequiresParam() ? command.getParamHint() : "此命令无需参数");
+            cmdParamField.setDisable(!command.isRequiresParam());
+            if (!command.isRequiresParam()) {
+                cmdParamField.clear();
+            }
+        }
+    }
+
+    /**
+     * 执行选中的快捷命令
+     */
+    @FXML
+    private void handleExecuteCommand() {
+        NetworkCommand command = cmdSelectCombo != null ? cmdSelectCombo.getValue() : null;
+        if (command == null) {
+            DialogUtils.warning("请先选择要执行的命令");
+            return;
+        }
+
+        String param = cmdParamField != null ? cmdParamField.getText() : "";
+
+        // 验证参数
+        if (command.isRequiresParam() && (param == null || param.trim().isEmpty())) {
+            DialogUtils.warning("此命令需要参数: " + command.getParamHint());
+            if (cmdParamField != null) {
+                cmdParamField.requestFocus();
+            }
+            return;
+        }
+
+        // 构建最终命令
+        String finalCmd;
+        try {
+            finalCmd = command.buildCommand(param);
+        } catch (IllegalArgumentException e) {
+            DialogUtils.error(e.getMessage());
+            return;
+        }
+
+        // 在输出区显示执行信息
+        String timestamp = LocalDateTime.now().format(timeFormatter);
+        appendOutput("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        appendOutput("[" + timestamp + "] 执行命令: " + finalCmd);
+        appendOutput("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+
+        // 设置 UI 状态
+        setCommandRunning(true);
+
+        // 异步执行命令
+        currentCommandTask = CmdUtils.executeAsync(finalCmd, command.getTimeoutSeconds());
+
+        currentCommandTask.messageProperty().addListener((obs, oldMsg, newMsg) -> {
+            Platform.runLater(() -> {
+                if (cmdStatusLabel != null) {
+                    cmdStatusLabel.setText(newMsg);
+                }
+            });
+        });
+
+        currentCommandTask.setOnSucceeded(event -> {
+            Platform.runLater(() -> {
+                String result = currentCommandTask.getValue();
+                if (result != null && !result.isEmpty()) {
+                    appendOutput(result);
+                } else {
+                    appendOutput("[无输出]");
+                }
+                appendOutput("\n[完成] " + LocalDateTime.now().format(timeFormatter));
+                setCommandRunning(false);
+                if (cmdStatusLabel != null) {
+                    cmdStatusLabel.setText("执行完成");
+                }
+            });
+        });
+
+        currentCommandTask.setOnFailed(event -> {
+            Platform.runLater(() -> {
+                Throwable ex = currentCommandTask.getException();
+                appendOutput("\n[错误] " + (ex != null ? ex.getMessage() : "未知错误"));
+                setCommandRunning(false);
+                if (cmdStatusLabel != null) {
+                    cmdStatusLabel.setText("执行失败");
+                }
+            });
+        });
+
+        currentCommandTask.setOnCancelled(event -> {
+            Platform.runLater(() -> {
+                appendOutput("\n[已取消] " + LocalDateTime.now().format(timeFormatter));
+                setCommandRunning(false);
+                if (cmdStatusLabel != null) {
+                    cmdStatusLabel.setText("已取消");
+                }
+            });
+        });
+
+        new Thread(currentCommandTask).start();
+    }
+
+    /**
+     * 取消正在执行的命令
+     */
+    @FXML
+    private void handleCancelCommand() {
+        if (currentCommandTask != null && currentCommandTask.isRunning()) {
+            currentCommandTask.cancel(true);
+            logger.info("用户取消了命令执行");
+        }
+    }
+
+    /**
+     * 清空命令输出
+     */
+    @FXML
+    private void handleClearOutput() {
+        if (cmdOutputArea != null) {
+            cmdOutputArea.clear();
+        }
+    }
+
+    /**
+     * 复制命令输出到剪贴板
+     */
+    @FXML
+    private void handleCopyOutput() {
+        if (cmdOutputArea != null && !cmdOutputArea.getText().isEmpty()) {
+            Clipboard clipboard = Clipboard.getSystemClipboard();
+            ClipboardContent content = new ClipboardContent();
+            content.putString(cmdOutputArea.getText());
+            clipboard.setContent(content);
+            DialogUtils.success("命令输出已复制到剪贴板", Duration.seconds(1.5));
+        } else {
+            DialogUtils.warning("没有可复制的输出内容");
+        }
+    }
+
+    /**
+     * 命令参数输入框按键处理（Enter执行命令）
+     */
+    @FXML
+    private void handleCmdParamKeyPress(KeyEvent event) {
+        if (event.getCode() == KeyCode.ENTER) {
+            handleExecuteCommand();
+        }
+    }
+
+    /**
+     * 设置命令执行状态的 UI
+     */
+    private void setCommandRunning(boolean running) {
+        if (cmdExecuteBtn != null) {
+            cmdExecuteBtn.setDisable(running);
+        }
+        if (cmdCancelBtn != null) {
+            cmdCancelBtn.setDisable(!running);
+        }
+        if (cmdCategoryCombo != null) {
+            cmdCategoryCombo.setDisable(running);
+        }
+        if (cmdSelectCombo != null) {
+            cmdSelectCombo.setDisable(running);
+        }
+        if (cmdProgressBar != null) {
+            cmdProgressBar.setVisible(running);
+            cmdProgressBar.setManaged(running);
+            if (running) {
+                cmdProgressBar.setProgress(-1); // indeterminate
+            }
+        }
+    }
+
+    /**
+     * 向输出区域追加文本
+     */
+    private void appendOutput(String text) {
+        if (cmdOutputArea != null) {
+            Platform.runLater(() -> {
+                cmdOutputArea.appendText(text + "\n");
+                // 自动滚动到底部
+                cmdOutputArea.setScrollTop(Double.MAX_VALUE);
+            });
+        }
     }
 }
