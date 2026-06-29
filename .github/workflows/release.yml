@@ -1,17 +1,14 @@
 # Release 工作流 - 推送 tag 时自动构建多平台安装包并发布到 GitHub Releases
-# 参考: kafka-visark/.github/workflows/build-release.yml
-name: Build & Release
+# 直接参照 kafka-visark/.github/workflows/build-release.yml 成功配置
+name: Build and Release
 
 on:
   push:
     tags:
-      - 'v*'  # 匹配 v1.0.0, v2.0.0 等标签
+      - 'v*'  # 创建 tag 时自动触发
   workflow_dispatch:  # 支持手动触发
 
 jobs:
-  # ============================================================
-  # 多平台构建 - 使用矩阵策略并行构建
-  # ============================================================
   build:
     strategy:
       matrix:
@@ -51,25 +48,17 @@ jobs:
       APP_VERSION: ""
 
     steps:
-      - name: Checkout source code
+      - name: 检出项目
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # 需要完整历史以获取 tag 信息
 
-      # 必须使用 Zulu 发行版：Temurin 从 JDK 24 起不再包含 jmods，
-      # 而 jlink/jpackage 需要 jmods 来创建自定义运行时镜像
-      - name: Set up JDK 25
+      - name: 设置 Java
         uses: actions/setup-java@v4
         with:
           java-version: '25'
           distribution: 'zulu'
           cache: 'maven'
-
-      - name: Verify Java environment
-        run: |
-          java -version
-          echo "JAVA_HOME: $JAVA_HOME"
-        shell: bash
 
       # Windows 专用 - 配置 WiX Toolset（生成 MSI 需要）
       - name: Configure WiX Toolset (Windows)
@@ -118,7 +107,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y fakeroot
 
-      - name: Parse version
+      - name: 解析版本号
         id: get-version
         shell: bash
         run: |
@@ -130,31 +119,28 @@ jobs:
           VERSION=$(echo "$VERSION" | sed 's/-SNAPSHOT$//')
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Project version: $VERSION"
+          echo "✅ 项目版本: $VERSION"
 
-      - name: Verify Java
+      - name: 验证 Java
         run: |
           java -version
           echo "JAVA_HOME: $JAVA_HOME"
 
-      # 执行打包（插件会自动执行 package 阶段）
-      - name: Build installer
+      - name: 执行打包
         run: mvn -B clean jfx:package -DAPP_TYPE=${{ matrix.type }}
 
-      - name: List build artifacts
+      - name: 列举生成的构建物
         shell: bash
-        run: ls -lh target/javafx/ 2>/dev/null || dir target\\javafx
+        run: |
+          ls -lh target/javafx/ 2>/dev/null || dir target\\javafx
 
-      - name: Upload artifacts
+      - name: 上传构建物
         uses: actions/upload-artifact@v4
         with:
           name: network-port-tools-${{ matrix.os }}-${{ matrix.arch }}-${{ matrix.type }}
           path: target/javafx/${{ matrix.artifact }}
           retention-days: 5
 
-  # ============================================================
-  # 发布到 GitHub Releases
-  # ============================================================
   release:
     needs: build
     runs-on: ubuntu-latest
@@ -163,33 +149,33 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout source code
+      - name: 检出项目
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Parse release version
+      - name: 解析版本号
         id: get-version
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Release version: $VERSION"
+          echo "✅ Release 版本: $VERSION"
 
-      - name: Download all artifacts
+      - name: 下载所有构建物
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: List downloaded artifacts
+      - name: 列举下载的构建物
         run: |
-          echo "=== All release artifacts ==="
-          find artifacts -type f 2>/dev/null || ls -laR artifacts/
-          echo "=== Directory structure ==="
+          echo "--- 所有构建物 ---"
+          find artifacts -type f 2>/dev/null || ls -laR artifacts/ || echo "目录不存在"
+          echo "--- 目录结构 ---"
           pwd
           ls -la
 
-      - name: Create GitHub Release
+      - name: 创建 Release
         uses: softprops/action-gh-release@v2
         with:
           name: Network Port Tools v${{ env.APP_VERSION }}
@@ -215,7 +201,7 @@ jobs:
             - Linux: Ubuntu 20.04+, Debian 11+, Fedora 35+
 
             ### 更新日志
-            请查看 [提交记录](https://github.com/${{ github.repository }}/commits/v${{ env.APP_VERSION }}) 了解详情
+            请查看 [commit 历史](https://github.com/${{ github.repository }}/commits/v${{ env.APP_VERSION }}) 了解变更详情。
           draft: false
           prerelease: false
           files: |

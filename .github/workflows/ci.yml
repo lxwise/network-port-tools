@@ -1,4 +1,7 @@
 # CI 工作流 - 每次推送和PR时自动构建验证
+# 参考 kafka-visark: 使用平台对应的具体类型，而非 app-image
+# 原因: pom.xml 中配置了 linuxPackageName/winShortcut 等选项，
+#       这些选项只能用于具体安装包类型(deb/rpm/exe/dmg)，不兼容 app-image
 name: CI Build
 
 on:
@@ -11,35 +14,43 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            type: deb
+          - os: windows-latest
+            type: exe
+          - os: macos-latest
+            type: dmg
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Checkout source code
+      - name: 检出项目
         uses: actions/checkout@v4
 
-      # 必须使用 Zulu 发行版：Temurin 从 JDK 24 起不再包含 jmods，
-      # 而 jlink/jpackage 需要 jmods 来创建自定义运行时镜像
-      - name: Set up JDK 25
+      - name: 设置 Java
         uses: actions/setup-java@v4
         with:
           java-version: '25'
           distribution: 'zulu'
           cache: 'maven'
 
-      - name: Verify Java environment
-        shell: bash
+      # Linux 专用 - 安装打包工具
+      - name: Install Linux packaging tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fakeroot
+
+      - name: 验证 Java
         run: |
           java -version
           echo "JAVA_HOME: $JAVA_HOME"
-          # 验证 jmods 目录存在（jlink/jpackage 必需）
-          ls "$JAVA_HOME/jmods" > /dev/null 2>&1 && echo "✅ jmods directory found" || echo "❌ jmods directory missing"
 
-      - name: Build and package (app-image)
-        run: mvn -B clean jfx:package -DAPP_TYPE=app-image
+      - name: 执行打包
+        run: mvn -B clean jfx:package -DAPP_TYPE=${{ matrix.type }}
 
-      - name: Verify build output
+      - name: 验证构建产物
         shell: bash
         run: |
-          echo "Build completed successfully on ${{ matrix.os }}"
+          echo "✅ Build completed successfully on ${{ matrix.os }} (type: ${{ matrix.type }})"
           ls -lh target/javafx/ 2>/dev/null || dir target\\javafx
