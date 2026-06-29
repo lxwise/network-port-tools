@@ -1,0 +1,216 @@
+# Release 工作流 - 推送 tag 时自动构建多平台安装包并发布到 GitHub Releases
+# 参考: kafka-visark/.github/workflows/build-release.yml
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # 匹配 v1.0.0, v2.0.0 等标签
+  workflow_dispatch:  # 支持手动触发
+
+jobs:
+  # ============================================================
+  # 多平台构建 - 使用矩阵策略并行构建
+  # ============================================================
+  build:
+    strategy:
+      matrix:
+        include:
+          # macOS ARM64 (Apple Silicon)
+          - os: macos-14
+            arch: arm64
+            type: dmg
+            artifact: "*.dmg"
+          # macOS x86_64 (Intel)
+          - os: macos-15-intel
+            arch: x86_64
+            type: dmg
+            artifact: "*.dmg"
+          # Windows x86_64 - EXE
+          - os: windows-2022
+            arch: x86_64
+            type: exe
+            artifact: "*.exe"
+          # Windows x86_64 - MSI
+          - os: windows-2022
+            arch: x86_64
+            type: msi
+            artifact: "*.msi"
+          # Linux x86_64 - DEB
+          - os: ubuntu-latest
+            arch: x86_64
+            type: deb
+            artifact: "*.deb"
+          # Linux x86_64 - RPM
+          - os: ubuntu-latest
+            arch: x86_64
+            type: rpm
+            artifact: "*.rpm"
+    runs-on: ${{ matrix.os }}
+    env:
+      APP_VERSION: ""
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      # Windows 专用 - 配置 WiX Toolset（生成 MSI 需要）
+      - name: Configure WiX Toolset (Windows)
+        if: runner.os == 'Windows' && matrix.type == 'msi'
+        shell: powershell
+        run: |
+          $wixPaths = @(
+            "${env:ProgramFiles(x86)}\WiX Toolset v3.14\bin",
+            "${env:ProgramFiles}\WiX Toolset v3.14\bin",
+            "${env:ProgramFiles(x86)}\WiX Toolset v3.11\bin",
+            "${env:ProgramFiles}\WiX Toolset v3.11\bin",
+            "C:\Program Files (x86)\WiX Toolset v3.14\bin",
+            "C:\Program Files\WiX Toolset v3.14\bin"
+          )
+
+          $foundPath = $null
+          foreach ($path in $wixPaths) {
+            if (Test-Path "$path\light.exe") {
+              $foundPath = $path
+              Write-Output "Found WiX Toolset at: $path"
+              break
+            }
+          }
+
+          if ($null -eq $foundPath) {
+            $whereResult = where.exe light.exe 2>&1
+            if ($whereResult -match "light\.exe") {
+              $foundPath = Split-Path $whereResult -Parent
+              Write-Output "Found WiX Toolset using where command at: $foundPath"
+            }
+          }
+
+          if ($null -eq $foundPath) {
+            Write-Error "Could not find WiX Toolset installation."
+            exit 1
+          }
+
+          $env:PATH = "$foundPath;$env:PATH"
+          echo "$foundPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          Write-Output "Added WiX Toolset to PATH: $foundPath"
+
+      # Linux 专用 - 安装打包工具
+      - name: Install Linux packaging tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fakeroot
+
+      - name: Parse version
+        id: get-version
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            VERSION=$(powershell -Command "(Get-Content pom.xml -Raw) -match '<version>([\d\.]+)' | ForEach-Object { \$matches[1] }")
+          else
+            VERSION=$(mvn -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec)
+          fi
+          VERSION=$(echo "$VERSION" | sed 's/-SNAPSHOT$//')
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Project version: $VERSION"
+
+      - name: Verify Java
+        run: |
+          java -version
+          echo "JAVA_HOME: $JAVA_HOME"
+
+      # 执行打包（插件会自动执行 package 阶段）
+      - name: Build installer
+        run: mvn -B clean jfx:package -DAPP_TYPE=${{ matrix.type }}
+
+      - name: List build artifacts
+        shell: bash
+        run: ls -lh target/javafx/ 2>/dev/null || dir target\\javafx
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: network-port-tools-${{ matrix.os }}-${{ matrix.arch }}-${{ matrix.type }}
+          path: target/javafx/${{ matrix.artifact }}
+          retention-days: 5
+
+  # ============================================================
+  # 发布到 GitHub Releases
+  # ============================================================
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Parse release version
+        id: get-version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Release version: $VERSION"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List downloaded artifacts
+        run: |
+          echo "=== All release artifacts ==="
+          find artifacts -type f 2>/dev/null || ls -laR artifacts/
+          echo "=== Directory structure ==="
+          pwd
+          ls -la
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Network Port Tools v${{ env.APP_VERSION }}
+          body: |
+            ## Network Port Tools v${{ env.APP_VERSION }}
+
+            网络端口管理工具 - 基于 JavaFX 的跨平台桌面应用
+
+            ### 下载安装包
+
+            | 平台 | 架构 | 格式 | 文件名 |
+            |------|------|------|--------|
+            | macOS | arm64 | dmg | `network-port-tools-darwin-arm64-${{ env.APP_VERSION }}.dmg` |
+            | macOS | x86_64 | dmg | `network-port-tools-darwin-x86_64-${{ env.APP_VERSION }}.dmg` |
+            | Windows | x86_64 | exe | `network-port-tools-windows-x86_64-${{ env.APP_VERSION }}.exe` |
+            | Windows | x86_64 | msi | `network-port-tools-windows-x86_64-${{ env.APP_VERSION }}.msi` |
+            | Linux | x86_64 | deb | `network-port-tools-linux-x86_64-${{ env.APP_VERSION }}.deb` |
+            | Linux | x86_64 | rpm | `network-port-tools-linux-x86_64-${{ env.APP_VERSION }}.rpm` |
+
+            ### 系统要求
+            - Windows 10/11 (64位)
+            - macOS 12+ (Intel / Apple Silicon)
+            - Linux: Ubuntu 20.04+, Debian 11+, Fedora 35+
+
+            ### 更新日志
+            请查看 [提交记录](https://github.com/${{ github.repository }}/commits/v${{ env.APP_VERSION }}) 了解详情
+          draft: false
+          prerelease: false
+          files: |
+            artifacts/**/*.*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

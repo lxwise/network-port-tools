@@ -1,0 +1,35 @@
+# CI 工作流 - 每次推送和PR时自动构建验证
+name: CI Build
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build and package (app-image)
+        run: mvn -B clean jfx:package -DAPP_TYPE=app-image
+
+      - name: Verify build output
+        shell: bash
+        run: |
+          echo "Build completed successfully on ${{ matrix.os }}"
+          ls -lh target/javafx/ 2>/dev/null || dir target\\javafx
