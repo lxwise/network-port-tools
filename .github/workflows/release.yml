@@ -56,12 +56,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      # 必须使用 Zulu 发行版：Temurin 从 JDK 24 起不再包含 jmods，
+      # 而 jlink/jpackage 需要 jmods 来创建自定义运行时镜像
       - name: Set up JDK 25
         uses: actions/setup-java@v4
         with:
           java-version: '25'
-          distribution: 'temurin'
+          distribution: 'zulu'
           cache: 'maven'
+
+      - name: Verify Java environment
+        run: |
+          java -version
+          echo "JAVA_HOME: $JAVA_HOME"
+        shell: bash
 
       # Windows 专用 - 配置 WiX Toolset（生成 MSI 需要）
       - name: Configure WiX Toolset (Windows)
@@ -212,5 +220,4 @@ jobs:
           prerelease: false
           files: |
             artifacts/**/*.*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}

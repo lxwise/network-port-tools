@@ -18,12 +18,22 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v4
 
+      # 必须使用 Zulu 发行版：Temurin 从 JDK 24 起不再包含 jmods，
+      # 而 jlink/jpackage 需要 jmods 来创建自定义运行时镜像
       - name: Set up JDK 25
         uses: actions/setup-java@v4
         with:
           java-version: '25'
-          distribution: 'temurin'
+          distribution: 'zulu'
           cache: 'maven'
+
+      - name: Verify Java environment
+        shell: bash
+        run: |
+          java -version
+          echo "JAVA_HOME: $JAVA_HOME"
+          # 验证 jmods 目录存在（jlink/jpackage 必需）
+          ls "$JAVA_HOME/jmods" > /dev/null 2>&1 && echo "✅ jmods directory found" || echo "❌ jmods directory missing"
 
       - name: Build and package (app-image)
         run: mvn -B clean jfx:package -DAPP_TYPE=app-image
